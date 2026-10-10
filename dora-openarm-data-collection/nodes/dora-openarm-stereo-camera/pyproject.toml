@@ -1,0 +1,24 @@
+[project]
+name = "dora-openarm-stereo-camera"
+version = "0.1.0"
+description = "Dora node for an OpenArm side-by-side UVC stereo head camera"
+requires-python = ">=3.10"
+dependencies = [
+  "dora-rs >= 0.5.0",
+  "numpy",
+  "opencv-python-headless",
+  "pyarrow",
+  "websockets >= 15",
+]
+
+[project.scripts]
+dora-openarm-stereo-camera = "dora_openarm_stereo_camera.main:main"
+dora-openarm-wrist-camera = "dora_openarm_stereo_camera.wrist:main"
+dora-openarm-overhead-camera = "dora_openarm_stereo_camera.overhead:main"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

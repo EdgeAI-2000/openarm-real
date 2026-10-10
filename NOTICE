@@ -1,0 +1,23 @@
+OpenArm Real
+Published by EdgeAI-2000.
+
+This distribution includes OpenArm software and model assets originating from
+Enactic, Inc. and the enactic GitHub organization, licensed under Apache-2.0.
+Original copyright headers and component license files remain in place.
+
+Included upstream projects:
+  https://github.com/enactic/openarm_control
+  https://github.com/enactic/openarm_mujoco
+  https://github.com/enactic/dora-openarm-webxr
+  https://github.com/enactic/dora-openarm-kinematics
+  https://github.com/enactic/dora-openarm
+  https://github.com/enactic/dora-openarm-quitter
+  https://github.com/enactic/dora-openarm-data-collection-ui
+  https://github.com/enactic/dora-openarm-dataset-recorder
+
+The deployment snapshot includes local modifications and integration code.
+See docs/PROVENANCE.md for upstream revision records and publication changes.
+Upstream revision records identify the base snapshots, not unmodified contents.
+
+The separately installed dataset converter is not bundled:
+  https://github.com/enactic/openarm_dataset

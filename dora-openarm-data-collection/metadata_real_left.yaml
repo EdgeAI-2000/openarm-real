@@ -1,0 +1,14 @@
+location: Jetson lab
+operator: operator
+tasks:
+- prompt: Supervised small-motion left-arm teleoperation
+  description: OpenArm 2.0 left arm; no camera recording
+equipment:
+  id: OpenArm
+  version: '2.0'
+  embodiments:
+    arms:
+      id: OpenArm
+      version: '2.0'
+  perceptions:
+    cameras: {}

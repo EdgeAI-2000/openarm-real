@@ -1,0 +1,36 @@
+# Local environments and generated files
+.venv*/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.DS_Store
+node_modules/
+build/
+install/
+dist/
+log/
+logs/
+*.log
+
+# Local credentials and robot recordings
+.env
+.env.*
+!.env.example
+config/tls/
+*.key
+*.pem
+real_data/
+lerobot_data/
+output/
+runtime/
+*.mp4
+*.parquet
+*.arrow
+*.ckpt
+*.safetensors
+
+# Keep robot mesh files (*.obj, *.stl) under version control.

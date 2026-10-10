@@ -1,0 +1,30 @@
+location: Jetson lab
+operator: operator
+tasks:
+- prompt: Pick out the D, I, and G blocks and arrange them from left to right to spell DIG.
+  description:  >-
+    Select the blocks labeled D, I, and G from a pile of letter blocks
+    on the table. Place them next to each other in a single row,
+    ordered D, I, G from left to right, with the letters upright
+    and readable from the designated viewing side.
+
+
+equipment:
+  id: OpenArm
+  version: '2.0'
+  embodiments:
+    arms:
+      id: OpenArm
+      version: '2.0'
+  perceptions:
+    cameras:
+      head_left: {}
+      head_right: {}
+      wrist_left: {}
+      wrist_right: {}
+      ceiling:
+        id: RealSense D455
+        serial: 'YOUR_D455_SERIAL'
+        source_host: overhead-camera.local
+        ros_topic: /overhead/color/image_raw/compressed
+        timestamp_reference: jetson_receive

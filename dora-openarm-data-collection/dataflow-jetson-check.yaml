@@ -1,0 +1,80 @@
+nodes:
+- id: ui
+  path: dora-openarm-data-collection-ui
+  env:
+    METADATA_FILE: metadata_real.yaml
+    AUTO_OPEN: 'no'
+    ARM_AUTO_START: 'no'
+    PORT: '8000'
+  inputs:
+    tick: dora/timer/secs/1
+    button_a:
+      source: webxr/button_a
+      queue_size: 100
+    button_b:
+      source: webxr/button_b
+      queue_size: 100
+    vr_receive_times:
+      source: webxr/vr_receive_times
+      queue_size: 100
+  outputs:
+  - command
+  - arm_command
+- id: quittable-tick-leader
+  path: dora-openarm-quitter
+  inputs:
+    command: ui/command
+    tick: dora/timer/secs/1
+  outputs:
+  - tick
+- id: webxr
+  path: dora-openarm-webxr
+  env:
+    TLS_CERTIFICATE_FILE: ../config/tls/server.crt
+    TLS_KEY_FILE: ../config/tls/server.key
+    HOST: 0.0.0.0
+    PORT: '8443'
+  inputs:
+    tick: quittable-tick-leader/tick
+  outputs:
+  - pose_right
+  - trigger_right
+  - pose_left
+  - trigger_left
+  - joystick_x_right
+  - joystick_y_right
+  - joystick_x_left
+  - joystick_y_left
+  - button_a
+  - button_b
+  - button_x
+  - button_y
+  - status
+  - vr_receive_times
+  - pose_reference
+- id: ik
+  path: dora-openarm-ik
+  args: --xml ../openarm_mujoco/v2/pedestal/pedestal.xml --mode bimanual --max-iters
+    10 --dt 0.01 --damping 0.1 --posture-cost 0.01 --lm-damping 0.01 --limit-velocity
+    --config ../config/ik.yaml
+  inputs:
+    tick: quittable-tick-leader/tick
+    target_right:
+      source: webxr/pose_right
+      queue_size: 1
+    target_left:
+      source: webxr/pose_left
+      queue_size: 1
+    trigger_right: webxr/trigger_right
+    trigger_left: webxr/trigger_left
+  outputs:
+  - position_left
+  - position_right
+  - status
+- id: probe
+  path: ../probe.py
+  inputs:
+    right: ik/position_right
+    left: ik/position_left
+    tick: dora/timer/secs/1
+    command: ui/command

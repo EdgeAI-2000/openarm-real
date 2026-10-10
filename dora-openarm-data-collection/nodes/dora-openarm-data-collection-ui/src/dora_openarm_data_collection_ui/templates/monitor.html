@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>OpenArm camera monitor</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; min-height: 100%; background: #08090d; color: #e7e9ee; }
+      body {
+        font-family: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+        padding: 18px;
+      }
+      header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      h1 { margin: 0; font-size: 21px; }
+      .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+      button, .back {
+        border: 1px solid #343846;
+        border-radius: 8px;
+        background: #171923;
+        color: #b7bbc8;
+        padding: 8px 13px;
+        font: inherit;
+        cursor: pointer;
+        text-decoration: none;
+      }
+      button.active { color: #071014; background: #00d7f0; border-color: #00d7f0; }
+      .status-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 12px;
+        font-size: 13px;
+      }
+      .pill { padding: 6px 10px; border-radius: 999px; background: #171923; color: #8d93a3; }
+      .pill.live, .arm.aligned { color: #001b0e; background: #00e683; }
+      .pill.warn, .arm.started { color: #211900; background: #ffd23f; }
+      .pill.stale { color: #d5d7dd; background: #4b4f5a; }
+      .arm.stopped { color: #d5d7dd; background: #4b4f5a; }
+      .stage {
+        position: relative;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 3px;
+        width: min(100%, 1600px);
+        margin: 0 auto;
+        overflow: hidden;
+        border: 1px solid #2b2e38;
+        border-radius: 12px;
+        background: #000;
+        aspect-ratio: 16 / 9;
+      }
+      .stage.stereo { grid-template-columns: 1fr 1fr; aspect-ratio: 32 / 9; }
+      .eye { min-width: 0; min-height: 0; position: relative; overflow: hidden; }
+      .eye.hidden { display: none; }
+      .eye canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        background: #000;
+      }
+      .eye-label {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        padding: 4px 7px;
+        border-radius: 5px;
+        background: rgba(0, 0, 0, 0.58);
+        color: #d7dae2;
+        font-size: 12px;
+      }
+      canvas.wrist {
+        position: absolute;
+        bottom: 3%;
+        width: min(24%, 360px);
+        aspect-ratio: 8 / 5;
+        object-fit: cover;
+        border: 2px solid rgba(255, 255, 255, 0.78);
+        border-radius: 9px;
+        background: #111;
+        z-index: 4;
+      }
+      .wrist.left { left: 3%; }
+      .wrist.right { right: 3%; }
+      .note {
+        max-width: 1600px;
+        margin: 12px auto 0;
+        color: #777e8e;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      .overhead { width: min(100%, 640px); margin: 16px auto 0; }
+      .overhead h2 { font-size: 15px; }
+      .overhead canvas { width: 100%; aspect-ratio: 4 / 3; background: #000; object-fit: contain; }
+      @media (max-width: 800px) {
+        body { padding: 10px; }
+        .stage.stereo { aspect-ratio: 16 / 9; grid-template-columns: 1fr; }
+        .stage.stereo .eye { position: absolute; inset: 0; }
+        .stage.stereo .eye:first-child { clip-path: inset(0 50% 0 0); }
+        .stage.stereo .eye:nth-child(2) { clip-path: inset(0 0 0 50%); }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>OpenArm camera monitor</h1>
+      <div class="toolbar">
+        <button type="button" data-mode="right" class="active">Right eye</button>
+        <button type="button" data-mode="left">Left eye</button>
+        <button type="button" data-mode="stereo">Stereo</button>
+        <a class="back" href="/">Control UI</a>
+      </div>
+    </header>
+
+    <div class="status-bar">
+      <span class="pill stale" id="vr-status">VR -- Hz</span>
+      <span class="pill stale" id="head-status">Head -- Hz</span>
+      {% if ceiling_enabled %}
+      <span class="pill stale" id="ceiling-status">Overhead -- Hz</span>
+      {% endif %}
+      <span class="pill arm {{ state.arm_status_left }}" id="arm-left">L: {{ state.arm_status_left | upper }}</span>
+      <span class="pill arm {{ state.arm_status_right }}" id="arm-right">R: {{ state.arm_status_right | upper }}</span>
+    </div>
+
+    <main class="stage" id="stage">
+      <div class="eye hidden" id="left-eye">
+        <canvas data-camera="camera_head_left" aria-label="Left head camera"></canvas>
+        <span class="eye-label">LEFT</span>
+      </div>
+      <div class="eye" id="right-eye">
+        <canvas data-camera="camera_head_right" aria-label="Right head camera"></canvas>
+        <span class="eye-label">RIGHT</span>
+      </div>
+      <canvas class="wrist left" data-camera="camera_wrist_left" aria-label="Left wrist camera"></canvas>
+      <canvas class="wrist right" data-camera="camera_wrist_right" aria-label="Right wrist camera"></canvas>
+    </main>
+
+    {% if ceiling_enabled %}
+    <section class="overhead">
+      <h2>Overhead camera · RealSense D455</h2>
+      <canvas data-camera="camera_ceiling" aria-label="Overhead camera"></canvas>
+    </section>
+    {% endif %}
+
+    <p class="note">
+      Live head and wrist{% if ceiling_enabled %}, plus overhead{% endif %} camera views.
+      This monitor cannot send robot commands.
+    </p>
+
+    <script>
+      const stage = document.getElementById("stage");
+      const leftEye = document.getElementById("left-eye");
+      const rightEye = document.getElementById("right-eye");
+      const modeButtons = [...document.querySelectorAll("[data-mode]")];
+
+      function setMode(mode) {
+        stage.classList.toggle("stereo", mode === "stereo");
+        leftEye.classList.toggle("hidden", mode === "right");
+        rightEye.classList.toggle("hidden", mode === "left");
+        for (const button of modeButtons) {
+          button.classList.toggle("active", button.dataset.mode === mode);
+        }
+        localStorage.setItem("openarm-monitor-mode", mode);
+      }
+      for (const button of modeButtons) {
+        button.addEventListener("click", () => setMode(button.dataset.mode));
+      }
+      const savedMode = localStorage.getItem("openarm-monitor-mode");
+      setMode(["right", "left", "stereo"].includes(savedMode) ? savedMode : "right");
+
+      const streamByPrefix = {
+        0: "camera_head_left",
+        1: "camera_head_right",
+        2: "camera_wrist_left",
+        3: "camera_wrist_right",
+        {% if ceiling_enabled %}
+        4: "camera_ceiling",
+        {% endif %}
+      };
+      const decoders = Object.fromEntries(
+        Object.values(streamByPrefix).map((camera) => [camera, { busy: false, pending: null }]),
+      );
+
+      async function drawLatest(camera) {
+        const decoder = decoders[camera];
+        if (decoder.busy) return;
+        decoder.busy = true;
+        try {
+          while (decoder.pending) {
+            const jpeg = decoder.pending;
+            decoder.pending = null;
+            try {
+              const bitmap = await createImageBitmap(new Blob([jpeg], { type: "image/jpeg" }));
+              const canvas = document.querySelector(`[data-camera="${camera}"]`);
+              if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
+                canvas.width = bitmap.width;
+                canvas.height = bitmap.height;
+              }
+              canvas.getContext("2d").drawImage(bitmap, 0, 0);
+              bitmap.close();
+            } catch (_) {
+              // A corrupt/incomplete JPEG is dropped; the next frame replaces it.
+            }
+          }
+        } finally {
+          decoder.busy = false;
+          if (decoder.pending) drawLatest(camera);
+        }
+      }
+
+      const videoScheme = location.protocol === "https:" ? "wss://" : "ws://";
+      const videoSocket = new WebSocket(videoScheme + location.host + "/monitor/video");
+      videoSocket.binaryType = "arraybuffer";
+      videoSocket.onmessage = (event) => {
+        const message = new Uint8Array(event.data);
+        const camera = streamByPrefix[message[0]];
+        if (!camera) return;
+        // Keep only the newest undecoded image from each camera to bound latency.
+        decoders[camera].pending = message.slice(1);
+        drawLatest(camera);
+      };
+
+      function rateClass(element, fps, threshold) {
+        element.classList.remove("live", "warn", "stale");
+        if (fps <= 0) element.classList.add("stale");
+        else if (fps < threshold) element.classList.add("warn");
+        else element.classList.add("live");
+      }
+
+      const statsSource = new EventSource("/stats");
+      statsSource.onmessage = (event) => {
+        const stats = JSON.parse(event.data);
+        const left = stats.camera_head_left?.fps || 0;
+        const right = stats.camera_head_right?.fps || 0;
+        const fps = left > 0 && right > 0 ? Math.min(left, right) : Math.max(left, right);
+        const label = document.getElementById("head-status");
+        label.textContent = `Head ${fps > 0 ? fps.toFixed(1) : "--"} Hz`;
+        rateClass(label, fps, 20);
+        {% if ceiling_enabled %}
+        const overheadFps = stats.camera_ceiling?.fps || 0;
+        const overheadLabel = document.getElementById("ceiling-status");
+        overheadLabel.textContent = `Overhead ${overheadFps > 0 ? overheadFps.toFixed(1) : "--"} Hz`;
+        rateClass(overheadLabel, overheadFps, 10);
+        {% endif %}
+      };
+
+      const vrSource = new EventSource("/vr-stats");
+      vrSource.onmessage = (event) => {
+        const fps = JSON.parse(event.data).fps || 0;
+        const label = document.getElementById("vr-status");
+        label.textContent = `VR ${fps > 0 ? fps.toFixed(1) : "--"} Hz`;
+        rateClass(label, fps, 50);
+      };
+
+      const stateSource = new EventSource("/events?since={{ state_version }}");
+      stateSource.onmessage = (event) => {
+        const value = JSON.parse(event.data);
+        for (const side of ["left", "right"]) {
+          const status = value[`arm_status_${side}`];
+          const element = document.getElementById(`arm-${side}`);
+          element.textContent = `${side === "left" ? "L" : "R"}: ${status.toUpperCase()}`;
+          element.className = `pill arm ${status}`;
+        }
+      };
+    </script>
+  </body>
+</html>
