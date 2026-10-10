@@ -64,7 +64,8 @@ nodes:
   - camera_wrist_left
 - id: wrist-camera-right
   path: dora-openarm-wrist-camera
-  args: --side right --width 960 --height 600 --fps 30 --jpeg-quality 70 --fourcc YUYV
+  args: --side right --width 960 --height 600 --fps 30 --jpeg-quality 70 --fourcc
+    YUYV
   inputs:
     tick: dora/timer/millis/33
   outputs:
@@ -116,7 +117,7 @@ nodes:
   path: dora-openarm-ik
   args: --xml ../openarm_mujoco/v2/pedestal/pedestal.xml --mode bimanual --max-iters
     10 --dt 0.01 --damping 0.1 --posture-cost 0.01 --lm-damping 0.01 --limit-velocity
-    --config ../config/ik.yaml
+    --config ../config/ik.yaml --require-feedback
   inputs:
     tick: quittable-tick-leader/tick
     target_right:
@@ -127,6 +128,12 @@ nodes:
       queue_size: 1
     trigger_right: webxr/trigger_right
     trigger_left: webxr/trigger_left
+    feedback_right:
+      source: follower-right/state
+      queue_size: 1
+    feedback_left:
+      source: follower-left/state
+      queue_size: 1
   outputs:
   - position_left
   - position_right
@@ -140,9 +147,14 @@ nodes:
       source: ik/position_right
       queue_size: 1
     command: ui/arm_command
+    peer_fault:
+      source: follower-left/safety_stop
+      queue_size: 1
   outputs:
   - state
   - status
+  - action
+  - safety_stop
 - id: follower-left
   path: dora-openarm
   args: --side left --align-trigger gripper --config openarm_pedestal
@@ -152,9 +164,14 @@ nodes:
       source: ik/position_left
       queue_size: 1
     command: ui/arm_command
+    peer_fault:
+      source: follower-right/safety_stop
+      queue_size: 1
   outputs:
   - state
   - status
+  - action
+  - safety_stop
 - id: recorder
   path: dora-openarm-dataset-recorder
   env:
@@ -162,9 +179,9 @@ nodes:
     DIRECTORY: real_data
   inputs:
     command: ui/command
-    arm_right_action: ik/position_right
+    arm_right_action: follower-right/action
     arm_right_observation: follower-right/state
-    arm_left_action: ik/position_left
+    arm_left_action: follower-left/action
     arm_left_observation: follower-left/state
     camera_head_left: stereo-camera/camera_head_left
     camera_head_right: stereo-camera/camera_head_right
@@ -172,7 +189,7 @@ nodes:
     camera_wrist_right: wrist-camera-right/camera_wrist_right
     camera_ceiling: overhead-camera/camera_ceiling
 - id: probe
-  path: ../probe.py
+  path: ../probe.sh
   inputs:
     right: ik/position_right
     left: ik/position_left

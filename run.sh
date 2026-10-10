@@ -4,10 +4,11 @@ cd "$(dirname "$(realpath "$0")")"
 mode="${1:-check}"
 usage() {
     echo 'Usage: bash run.sh check|right|left|bimanual [wifi|usb-stereo] [standard|d455]' >&2
+    echo 'Default transport: usb-stereo (Quest USB Type-C data cable).' >&2
     echo 'd455 is supported for check/bimanual with usb-stereo; standard is the default.' >&2
 }
 case "$mode" in check|right|left|bimanual) ;; *) usage; exit 2;; esac
-transport="${2:-wifi}"
+transport="${2:-usb-stereo}"
 camera_version="${3:-standard}"
 if (( $# > 3 )); then usage; exit 2; fi
 case "$camera_version" in standard|d455) ;; *) usage; exit 2;; esac
@@ -27,6 +28,12 @@ if [[ "$camera_version" == d455 ]]; then
     camera_suffix='-d455'
     dataflow="dataflow-jetson-${mode}-usb-stereo-d455.yaml"
 fi
+[[ -f "dora-openarm-data-collection/$dataflow" ]] || {
+    echo "Missing dataflow: $dataflow" >&2; exit 1;
+}
+[[ -x .venv/bin/python ]] || {
+    echo 'Core environment missing. Run: bash install.sh core' >&2; exit 1;
+}
 source .venv/bin/activate
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 PYTHONUNBUFFERED=1
 export NAME="jetson-${mode}-${transport}${camera_suffix}-$(date -u +%Y%m%d-%H%M%S)-$$"
@@ -124,7 +131,7 @@ if [[ "$transport" == usb-stereo ]]; then
     usb_launcher_pid=$!
     echo 'Mode: USB stereo; keep the Quest awake/on-head and its OpenArm page will launch automatically over the cable.'
 else
-    echo "Mode: Wi-Fi; Quest: https://192.168.5.70:8443/"
+    echo "Mode: Wi-Fi; Quest: https://${JETSON_HOST:-YOUR_JETSON_IP}:8443/"
 fi
 echo 'Collection UI: http://127.0.0.1:8000/'
 if [[ "$mode" != check ]]; then

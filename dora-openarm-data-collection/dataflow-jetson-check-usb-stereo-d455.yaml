@@ -60,7 +60,8 @@ nodes:
   - camera_wrist_left
 - id: wrist-camera-right
   path: dora-openarm-wrist-camera
-  args: --side right --width 960 --height 600 --fps 30 --jpeg-quality 70 --fourcc YUYV
+  args: --side right --width 960 --height 600 --fps 30 --jpeg-quality 70 --fourcc
+    YUYV
   inputs:
     tick: dora/timer/millis/33
   outputs:
@@ -128,7 +129,7 @@ nodes:
   - position_right
   - status
 - id: probe
-  path: ../probe.py
+  path: ../probe.sh
   inputs:
     right: ik/position_right
     left: ik/position_left

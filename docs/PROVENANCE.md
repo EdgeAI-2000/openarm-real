@@ -42,4 +42,8 @@ The local stereo/wrist/overhead camera integration has no separate upstream revi
 - Excluded recordings, converted datasets, output files, virtual environments, caches, generated package metadata, Git histories and TLS material.
 - Preserved control logic, model assets and original component license/copyright notices. The missing Wi-Fi bimanual dataflow was not reconstructed.
 
-The source machine's files were not modified during publication.
+The source machine's files were not modified during the initial publication. The later repair update was applied separately with a source backup.
+
+## Software repair update (2026-10-10)
+
+Added the missing Wi-Fi bimanual graph, feedback-aware IK, follower guards and cleanup, actual-command recording, measured episode frequencies, historical frequency repair, source-manifest maintenance and hardware-free tests/CI. Control wrappers/dataflows are modified relative to the initial publication. Physical startup/stop remains the responsibility of the installed driver.

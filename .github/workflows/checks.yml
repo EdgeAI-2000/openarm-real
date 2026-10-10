@@ -1,0 +1,28 @@
+name: Software checks (no hardware)
+on: [push, pull_request]
+jobs:
+  software:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install compute and test dependencies
+        run: >-
+          python -m pip install -c constraints.txt pytest
+          -e openarm_mujoco -e openarm_control
+          -e dora-openarm-data-collection/nodes/dora-openarm-kinematics
+          -e dora-openarm-data-collection/nodes/dora-openarm-stereo-camera
+          -e dora-openarm-data-collection/nodes/dora-openarm-webxr
+          -e dora-openarm-data-collection/nodes/dora-openarm-dataset-recorder
+      - name: Fault injection and regression tests
+        run: >-
+          python -m pytest -q tests openarm_control/tests
+          dora-openarm-data-collection/nodes/dora-openarm-stereo-camera/tests
+          dora-openarm-data-collection/nodes/dora-openarm-webxr/tests
+          dora-openarm-data-collection/nodes/dora-openarm-dataset-recorder/tests
+      - name: Local IK benchmark
+        run: python preflight.py
+      - name: Verify source manifest
+        run: python scripts/update_manifest.py --check

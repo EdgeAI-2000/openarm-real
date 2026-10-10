@@ -24,7 +24,7 @@ flowchart LR
     Convert --> LeRobot[LeRobot v3.0 / v2.1]
 ```
 
-The current dataflows record measured state but do not feed it back into IK. MuJoCo is used for the robot model and kinematics; these real-robot dataflows do not start a physics viewer.
+Real-robot dataflows feed measured state back into IK and record the commands actually sent by the follower after limits. MuJoCo is used for the robot model and kinematics; these real-robot dataflows do not start a physics viewer.
 
 ## Repository layout / 目录
 
@@ -76,9 +76,9 @@ The collection UI listens on `127.0.0.1:8000`; `/monitor` shows camera previews.
 | `bash run.sh bimanual usb-stereo` | Bimanual teleoperation and four-camera recording |
 | `bash run.sh check usb-stereo d455` | Check with an additional overhead camera |
 | `bash run.sh bimanual usb-stereo d455` | Bimanual recording with five cameras |
-| `bash run.sh check` / `right` / `left` | Wi-Fi modes; TLS required, camera recording absent |
+| `bash run.sh check wifi` / `right wifi` / `left wifi` | Wi-Fi modes; TLS required, camera recording absent |
 
-The original deployment is missing `dataflow-jetson-bimanual.yaml`; **Wi-Fi bimanual mode is unavailable in this snapshot**. Use the USB dataflow only after its own checks pass. No hardware motion is implied by cloning or installing the repository.
+USB stereo is the default transport when the second argument is omitted. Wi-Fi bimanual mode is available as `bash run.sh bimanual wifi`; it records joints but no images. No hardware motion is implied by cloning or installing the repository.
 
 ## Data / 数据
 
@@ -99,8 +99,14 @@ The standard bimanual layout is right arm 7 joints + gripper, followed by left a
 
 Robot modes default to stopped. The UI **Arm Start** command creates and starts the driver and may move the robot to its configured initial pose. Recording buttons and motor controls are separate. Alignment moves toward the hand-controller target before normal following begins.
 
-The current code has no complete headset-disconnection watchdog, task-level collision avoidance or measured-state tracking guard. Software Stop and process exit may execute a stop trajectory; they are not a physical emergency stop. Real-robot operation requires onsite supervision, a verified CAN mapping, known zero positions and a physical emergency stop. See [known limitations](docs/KNOWN_LIMITATIONS.md).
+Follower guards stop on target/feedback timeouts, reject invalid/stale targets, check arm tracking error and bound commands using elapsed time. Bimanual faults propagate to the peer follower. These are software checks; task-level collision avoidance is not implemented. Software Stop and process exit may execute a stop trajectory; they are not a physical emergency stop. Real-robot operation requires onsite supervision, a verified CAN mapping, known zero positions and a physical emergency stop. See [known limitations](docs/KNOWN_LIMITATIONS.md).
 
 ## License and attribution
 
 Apache-2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE). Upstream Enactic OpenArm copyrights and component license files are preserved. This repository is maintained by EdgeAI-2000 and is not an official upstream OpenArm release.
+
+## Software verification
+
+`tests/test_runtime_guards.py` uses fake drivers for fault injection; it never connects to motors. GitHub Actions runs these tests, existing compute/camera unit tests, the local IK benchmark and source-manifest verification. Refresh source hashes with `python scripts/update_manifest.py` after editing files.
+
+Historical frequency metadata can be inspected with `python scripts/measure_dataset_rates.py PATH_TO_RAW_DATASET`. Add `--update` to back up and repair only frequency metadata. Raw images and trajectories are left intact.

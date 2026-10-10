@@ -15,69 +15,11 @@
 """Node to control OpenArm."""
 
 import argparse
-import dataclasses
-import enum
 import dora
 import openarm_driver
-import os
 import pathlib
 import pyarrow as pa
 import numpy as np
-
-
-class ArmStatus(str, enum.Enum):
-    """Arm control states."""
-
-    STOPPED = "stopped"
-    STARTED = "started"
-    ALIGNED = "aligned"
-
-
-@dataclasses.dataclass
-class AlignState:
-    """State for alignment."""
-
-    align_target: np.ndarray = None
-    step_limit: float = 0.001
-
-
-def _align(arm, state, new_position, name, threshold, trigger=None):
-    """Safety: Align OpenArm with the position."""
-    if trigger == "gripper":  # Check if gripper is active (threshold ~ -10 deg)
-        gripper_position = new_position[-1]  # Last value is gripper's position
-        if name == "right_arm":
-            is_gripping = gripper_position > np.deg2rad(-5)
-        elif name == "left_arm":
-            is_gripping = gripper_position < np.deg2rad(5)
-        if not is_gripping:
-            return False
-
-    current_position = np.array(arm.fetch_position(), dtype=np.float32)
-
-    if state.align_target is None:
-        state.align_target = current_position.copy()
-
-    def is_aligned(position1, position2):
-        return np.all(np.abs(position1[:-1] - position2[:-1]) < threshold)
-
-    # If OpenArm is already aligned, we do nothing.
-    if is_aligned(new_position, current_position):
-        return True
-    diff = new_position - state.align_target
-    step_move = np.clip(diff, -state.step_limit, state.step_limit)
-    state.align_target += step_move
-
-    arm.send_position(state.align_target)
-
-    # Check the physical position on the next command after the arm has moved.
-    return False
-
-
-def _env_flag(name, default=False):
-    v = os.getenv(name)
-    if v is None:
-        return default
-    return v.strip().lower() in ("1", "true", "yes", "on")
 
 
 QPOS_TYPE = pa.struct([("qpos", pa.list_(pa.float32()))])
@@ -161,125 +103,97 @@ def main():
         help="Align to incoming position commands after start (default: enabled).",
     )
     parser.add_argument(
-        "--stop",
-        action=argparse.BooleanOptionalAction,
-        default=_env_flag("STOP", True),
-        help="Stop the arm on exit.",
-    )
-    parser.add_argument(
-        "--refresh-every-request",
-        action=argparse.BooleanOptionalAction,
-        default=_env_flag("REFRESH", True),
-        help="Refresh OpenArm on every request to make it more accurate.",
-    )
-    parser.add_argument(
         "--start-on-startup",
         action=argparse.BooleanOptionalAction,
         default=False,
         help="Start the arm on startup.",
     )
+    parser.add_argument("--target-timeout", type=float, default=0.5,
+                        help="Target/feedback timeout in seconds (default 0.5).")
+    parser.add_argument("--tracking-error", type=float, default=0.35,
+                        help="Maximum arm-joint tracking error in rad (default 0.35).")
     args = parser.parse_args()
     if args.align_delta_limit <= 0.0:
         parser.error("--align-delta-limit must be positive")
+    from .session import Session, GuardFault
+    import datetime
+    import time
+
     node = dora.Node()
     name = f"{args.side}_arm"
     config = openarm_driver.Config(args.config)
-    align_threshold = args.align_threshold
-    arm = None
-    ready_status = ArmStatus.ALIGNED if args.align else ArmStatus.STARTED
-    if args.start_on_startup:
-        arm = openarm_driver.SingleArmDriver(name, config)
-        arm.start()
-        align_state = (
-            AlignState(step_limit=args.align_delta_limit) if args.align else None
-        )
-        status = ArmStatus.STARTED
-        node.send_output("status", pa.array([status]))
-    else:
-        align_state = None
-        status = ArmStatus.STOPPED
-        node.send_output("status", pa.array([ArmStatus.STOPPED]))
-    for event in node:
-        if event["type"] != "INPUT":
-            continue
 
-        event_id = event["id"]
-        if event_id == "command":
-            command = event["value"][0].as_py()
-            if command == "start":
-                if arm is not None:
-                    arm.stop()  # Stop the existing session before replacing it
-                arm = openarm_driver.SingleArmDriver(
-                    name, config
-                )  # Re-initialize the arm to ensure a fresh start
-                arm.start()
-                align_state = (
-                    AlignState(step_limit=args.align_delta_limit)
-                    if args.align
-                    else None
-                )
-                status = ArmStatus.STARTED
-                node.send_output("status", pa.array([status]))
-            elif command == "stop":
-                status = ArmStatus.STOPPED
-                node.send_output("status", pa.array([ArmStatus.STOPPED]))
-                if arm is not None:
-                    arm.stop()
-                    arm = None  # Drop the instance to free resources
-                align_state = None
-        elif event_id == "request_position":
-            if status is ArmStatus.STOPPED:
-                continue
-            current_position = arm.fetch_position(
-                refresh=args.refresh_every_request,
-            )
-            node.send_output(
-                "position",
-                build_qpos_output(np.asarray(current_position, dtype=np.float32)),
-            )
-        elif event_id == "request_state":
-            if status is ArmStatus.STOPPED:
-                continue
-            state = arm.fetch_state(refresh=args.refresh_every_request)
-            node.send_output("state", build_state_output(state))
-        elif event_id == "move_position":
-            if status is ArmStatus.STOPPED:
-                continue
-            value = event["value"]
-            if isinstance(value, pa.StructArray):
-                names = value.type.names
-                if "qpos" in names:
-                    new_position = extract_values(value, "qpos")
-                else:
-                    new_position = np.array(
-                        value.field("new_position"), dtype=np.float32
-                    )
-                # TODO: We use this for safety check later.
-                # other_arm_position = value.field("other_arm_position")
-            else:
-                new_position = np.array(value, dtype=np.float32)
-                # other_arm_position = None
-
-            if status is ready_status:
-                arm.send_position(new_position)
-            elif status is ArmStatus.STARTED:
-                is_aligned = _align(
-                    arm,
-                    align_state,
-                    new_position,
-                    name,
-                    align_threshold,
-                    trigger=args.align_trigger,
-                )
-                if is_aligned:
-                    arm.send_position(new_position)
-                    status = ArmStatus.ALIGNED
-                    node.send_output("status", pa.array([ArmStatus.ALIGNED]))
-    if arm is not None:
-        if args.stop:
-            arm.stop()
+    def emit(output, value):
+        if output == "state":
+            value = build_state_output(value)
+        elif output == "action":
+            value = build_qpos_output(value)
         else:
-            arm.move_to_start_position()
+            value = pa.array([value])
+        node.send_output(output, value, {"timestamp": time.time_ns()})
+
+    session = Session(
+        lambda: openarm_driver.SingleArmDriver(name, config), emit,
+        side=args.side, align=args.align, align_trigger=args.align_trigger,
+        threshold=args.align_threshold, align_step=args.align_delta_limit,
+        timeout=args.target_timeout, tracking_error=args.tracking_error,
+    )
+    emit("status", "stopped")
+    faulted_at = 0
+
+    def event_age(event):
+        stamp = event.get("metadata", {}).get("timestamp")
+        if isinstance(stamp, datetime.datetime):
+            stamp = stamp.timestamp() * 1_000_000_000
+        age = float("inf") if stamp is None else (time.time_ns() - stamp) / 1e9
+        return stamp, age
+
+    try:
+        if args.start_on_startup:
+            session.start()
+        while True:
+            try:
+                session.check_timeouts()
+                event = node.next(timeout=0.02)
+                if event is None or event["type"] == "STOP":
+                    break
+                if event["type"] == "ERROR" and event.get("error", "").startswith("Timeout event stream error:"):
+                    continue
+                if event["type"] == "ERROR":
+                    raise RuntimeError(event.get("error", "Dora event error"))
+                if event["type"] != "INPUT":
+                    continue
+                event_id = event["id"]
+                if event_id == "peer_fault":
+                    faulted_at = time.time_ns()
+                    session.stop()
+                elif event_id == "command":
+                    command = event["value"][0].as_py()
+                    if command == "start":
+                        stamp, age = event_age(event)
+                        if not np.isfinite(age) or age < -0.05 or age > args.target_timeout or stamp <= faulted_at:
+                            print("Rejected stale Start command", flush=True)
+                            continue
+                        session.start()
+                    elif command == "stop":
+                        session.stop()
+                elif event_id in ("request_state", "request_position"):
+                    session.feedback()
+                elif event_id == "move_position":
+                    _, age = event_age(event)
+                    session.target(extract_values(event["value"], "qpos"), age)
+            except GuardFault as fault:
+                print(f"Safety stop: {fault}", flush=True)
+                faulted_at = time.time_ns()
+                session.stop(fault)
+    except BaseException as error:
+        # Notify the other follower before final cleanup, even on driver failures.
+        try:
+            emit("safety_stop", f"follower failure: {type(error).__name__}")
+        finally:
+            raise
+    finally:
+        session.stop()
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ bash install.sh core
 
 The installer creates a private Python 3.12 `.venv`. Core mode installs Dora, the editable model/control packages, WebXR, IK, cameras, UI, quitter and recorder. It does not configure CAN or start motors. `preflight.py` runs an IK benchmark without connecting to CAN.
 
-## 2. Connect Quest over USB
+## 2. Connect Quest over USB (default)
 
 Install ADB and enable Quest developer mode and USB debugging. Connect the headset with a data-capable cable, accept the debugging authorization, then inspect:
 
@@ -65,10 +65,10 @@ test ! -e config/tls/server.key && test ! -e config/tls/server.crt && (
     -subj "/CN=${JETSON_IP}" \
     -addext "subjectAltName=IP:${JETSON_IP},DNS:localhost,IP:127.0.0.1"
 )
-bash run.sh check
+bash run.sh check wifi
 ```
 
-Open `https://YOUR_JETSON_IP:8443/` in Quest. The address printed by the legacy `run.sh` is a deployment-specific hint and does not discover your IP. Wi-Fi modes in this snapshot do not record cameras; the Wi-Fi bimanual dataflow is missing.
+Open `https://YOUR_JETSON_IP:8443/` in Quest. Set `JETSON_HOST` to print your own headset URL. Wi-Fi modes do not record cameras; the Wi-Fi bimanual dataflow records both arms.
 
 ## 5. Hardware environment and onsite checks
 
@@ -135,3 +135,13 @@ The converter is pinned to upstream `openarm_dataset` commit `a69fe37384e26bb5c3
 The wrapper runs modality/time-overlap checks, the upstream validator, conversion and output verification. Defaults exclude failed and invalid episodes. The upstream validator can update input metadata; keep raw backups. Output paths must be new.
 
 Run `bash convert.sh` without arguments to view supported environment overrides. Do not loosen validity thresholds solely to force bad episodes through conversion.
+
+## Runtime guards
+
+The follower checks target and feedback freshness with a default 0.5 s timeout, validates finite eight-value vectors, and compares measured arm joints with the last sent command (default 0.35 rad maximum error). These parameters are configurable with `--target-timeout` and `--tracking-error` in follower arguments. Their defaults require onsite validation.
+
+Every sent command is limited using monotonic elapsed time, capped at a 50 ms allowance: seven arm limits `[2, 2, 3.14, 3.14, 6.3, 6.3, 6.3]` rad/s and a gripper command limit of 0.5 rad/s. These bounds apply to position-command changes, not measured physical velocity. Startup/stop movements are still owned by the driver.
+
+After a guard fault, the session stops and remains stopped until a fresh manual Arm Start. In bimanual mode a fault requests stop from the other follower. Driver exceptions trigger peer notification and final cleanup. Blocking driver calls, lost power or a process kill cannot be handled by the Python watchdog; the physical emergency stop remains necessary.
+
+IK requires fresh feedback and fresh controller targets for every active side. The oldest contributing controller timestamp is preserved for follower freshness checks. Dataset action fields now record the limited commands sent by each follower; each episode also saves rates measured from its timestamps.

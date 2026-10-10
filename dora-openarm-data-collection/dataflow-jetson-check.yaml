@@ -72,7 +72,7 @@ nodes:
   - position_right
   - status
 - id: probe
-  path: ../probe.py
+  path: ../probe.sh
   inputs:
     right: ik/position_right
     left: ik/position_left

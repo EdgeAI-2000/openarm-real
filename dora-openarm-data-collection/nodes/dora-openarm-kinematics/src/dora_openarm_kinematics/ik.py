@@ -35,6 +35,7 @@ Outputs:
 from __future__ import annotations
 
 import argparse
+import datetime
 import time
 
 import dora
@@ -65,61 +66,75 @@ def extract_values(value: pa.Array, key: str) -> np.ndarray:
     return np.array(value, dtype=np.float32)
 
 
+def timestamp_ns(metadata):
+    stamp = metadata.get("timestamp")
+    if isinstance(stamp, datetime.datetime):
+        return int(stamp.timestamp() * 1e9)
+    return stamp
+
+
+def fresh(stamp, now, timeout):
+    return stamp is not None and np.isfinite(stamp) and -0.05 <= (now - stamp) / 1e9 <= timeout
+
+
 def _run(args: argparse.Namespace) -> None:
     kin = Kinematics(setup_from_args(args), ik_params_from_args(args))
-
     node = dora.Node()
     node.send_output("status", pa.array(["ready"]))
-
+    feedback = {}
+    targets = {}
     for event in node:
         if event["type"] != "INPUT":
             continue
-
         eid = event["id"]
-
+        stamp = timestamp_ns(event["metadata"])
+        now = time.time_ns()
+        if eid.startswith("feedback_"):
+            side = eid.removeprefix("feedback_")
+            values = extract_values(event["value"], "qpos")
+            if side in kin.setup.sides:
+                if values.shape == (8,) and np.isfinite(values).all() and fresh(stamp, now, args.input_timeout):
+                    feedback[side] = (values, stamp)
+                else:
+                    feedback.pop(side, None)
+            continue
         if eid == "position":
             values = extract_values(event["value"], "qpos")
-            if values.shape == (16,):
+            if values.shape == (16,) and np.isfinite(values).all() and fresh(stamp, now, args.input_timeout):
                 kin.sync(values)
             continue
-
-        if eid == "target_right" and "right" in kin.setup.sides:
-            values = extract_values(event["value"], "pose")
-            if values.shape != (8,):
-                print(
-                    f"Warning: expected target_right[8], got {values.shape}. Skipping."
-                )
-                continue
-            pose = values[:7]
-            gripper_angle = values[7]
-            kin.set_target("right", pose)
-            kin.set_gripper("right", gripper_angle)
-
-        elif eid == "target_left" and "left" in kin.setup.sides:
-            values = extract_values(event["value"], "pose")
-            if values.shape != (8,):
-                print(
-                    f"Warning: expected target_left[8], got {values.shape}. Skipping."
-                )
-                continue
-            pose = values[:7]
-            gripper_angle = values[7]
-            kin.set_target("left", pose)
-            kin.set_gripper("left", gripper_angle)
-
-        else:
+        if not eid.startswith("target_"):
             continue
-
-        if not kin.ready():
+        side = eid.removeprefix("target_")
+        if side not in kin.setup.sides:
             continue
-
+        values = extract_values(event["value"], "pose")
+        if values.shape != (8,) or not np.isfinite(values).all() or not fresh(stamp, now, args.input_timeout):
+            targets.pop(side, None)
+            continue
+        kin.set_target(side, values[:7])
+        kin.set_gripper(side, values[7])
+        targets[side] = stamp
+        if not kin.ready() or not all(fresh(targets.get(s), now, args.input_timeout) for s in kin.setup.sides):
+            continue
+        if args.require_feedback:
+            if not all(s in feedback and fresh(feedback[s][1], now, args.input_timeout) for s in kin.setup.sides):
+                continue
+            measured = np.zeros(16, dtype=np.float32)
+            for s in kin.setup.sides:
+                offset = 0 if s == "right" else 8
+                measured[offset:offset + 8] = feedback[s][0]
+            kin.sync(measured)
+            kin.update_measured_state(measured)
         result = kin.solve()
-        if result is None:
+        if result is None or not np.isfinite(result).all():
             continue
-
-        ts = {"timestamp": time.time_ns()}
-        node.send_output("position_right", build_qpos_output(result[:8]), ts)
-        node.send_output("position_left", build_qpos_output(result[8:16]), ts)
+        # Keep the oldest contributing controller timestamp. Solver delay and an
+        # absent controller must not make stale poses appear fresh downstream.
+        metadata = {"timestamp": min(targets[s] for s in kin.setup.sides)}
+        for s in kin.setup.sides:
+            offset = 0 if s == "right" else 8
+            node.send_output("position_" + s, build_qpos_output(result[offset:offset + 8]), metadata)
 
 
 def main() -> None:
@@ -129,7 +144,11 @@ def main() -> None:
     )
     register_common_args(parser)
     register_ik_args(parser)
+    parser.add_argument("--require-feedback", action="store_true")
+    parser.add_argument("--input-timeout", type=float, default=0.5)
     args = parser.parse_args()
+    if not np.isfinite(args.input_timeout) or args.input_timeout <= 0:
+        parser.error("--input-timeout must be finite and positive")
     _run(args)
 
 

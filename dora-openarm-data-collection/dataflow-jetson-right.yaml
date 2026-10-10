@@ -58,13 +58,16 @@ nodes:
   path: dora-openarm-ik
   args: --xml ../openarm_mujoco/v2/pedestal/pedestal.xml --mode right --max-iters
     10 --dt 0.01 --damping 0.1 --posture-cost 0.01 --lm-damping 0.01 --limit-velocity
-    --config ../config/ik.yaml
+    --config ../config/ik.yaml --require-feedback
   inputs:
     tick: quittable-tick-leader/tick
     target_right:
       source: webxr/pose_right
       queue_size: 1
     trigger_right: webxr/trigger_right
+    feedback_right:
+      source: follower-right/state
+      queue_size: 1
   outputs:
   - position_left
   - position_right
@@ -81,6 +84,8 @@ nodes:
   outputs:
   - state
   - status
+  - action
+  - safety_stop
 - id: recorder
   path: dora-openarm-dataset-recorder
   env:
@@ -88,10 +93,10 @@ nodes:
     DIRECTORY: real_data
   inputs:
     command: ui/command
-    arm_right_action: ik/position_right
+    arm_right_action: follower-right/action
     arm_right_observation: follower-right/state
 - id: probe
-  path: ../probe.py
+  path: ../probe.sh
   inputs:
     right: ik/position_right
     tick: dora/timer/secs/1

@@ -39,6 +39,8 @@ class Episode:
     success: bool = False
     task_index: int = 0
 
+    camera_timestamps: dict = field(default_factory=dict)
+
     right_action_timestamps: ArrayLike = field(default_factory=list)
     right_actions: ArrayLike = field(default_factory=list)
     right_observation_timestamps: ArrayLike = field(default_factory=list)
@@ -218,6 +220,7 @@ class DatasetWriter:
                 id=str(episode.number),
                 success=episode.success,
                 task_index=episode.task_index,
+                measured_frequencies=episode_frequencies(episode),
             )
         )
         self._write_metadata_file()
@@ -250,39 +253,59 @@ class DatasetWriter:
         return existing_metadata
 
 
+def measured_hz(timestamps):
+    """Mean rate over a strictly increasing timestamp series; unknown if sparse."""
+    values = np.asarray(timestamps, dtype=np.int64)
+    if len(values) < 2 or np.any(np.diff(values) <= 0):
+        return None
+    return float((len(values) - 1) * 1e9 / (values[-1] - values[0]))
+
+
+def episode_frequencies(episode):
+    frequencies = {"action": {"arms": {}}, "obs": {"arms": {}}, "cameras": {}}
+    for side in ("left", "right"):
+        for kind, prefix in (("action", "action"), ("obs", "observation")):
+            stamps = getattr(episode, f"{side}_{prefix}_timestamps")
+            if len(stamps):
+                frequencies[kind]["arms"][side] = measured_hz(stamps)
+    frequencies["cameras"] = {name: measured_hz(stamps) for name, stamps in episode.camera_timestamps.items()}
+    return frequencies
+
+
 class FrequencyDetector:
-    """Detect frequency of an input."""
+    """Report nominal rates only for directly timer-triggered outputs."""
 
     def __init__(self, configs):
-        """Initialize with node configurations."""
         self._configs = configs
 
-    def detect(self, input):
-        """Detect frequency of the given input."""
-        if isinstance(input, dict):
-            input = input["source"]
-        node_id, name = input.split("/", 1)
-        for config in self._configs:
-            if config["id"] != node_id:
-                continue
-            inputs = config["inputs"]
-            next_input = (
-                inputs.get("tick")
-                or inputs.get("request_state")
-                or inputs.get("request_position")
-            )
-            if next_input is None:
-                continue
-            if next_input.startswith("dora/timer/"):
-                unit, value = next_input.split("/")[2:4]
-                if unit == "secs":
-                    return 1.0 / int(value)
-                elif unit == "millis":
-                    return 1_000.0 / int(value)
-                else:
-                    return None
-            else:
-                return self.detect(next_input)
+    def detect(self, source):
+        return self._detect(source, set())
+
+    def _detect(self, source, visited):
+        if isinstance(source, dict):
+            source = source["source"]
+        if source in visited:
+            return None
+        visited.add(source)
+        node_id, output = source.split("/", 1)
+        config = next((c for c in self._configs if c["id"] == node_id), None)
+        if config is None:
+            return None
+        inputs = config["inputs"]
+        # Action is driven by incoming commands; IK is driven by target events.
+        if output in ("action", "position_left", "position_right"):
+            return None
+        if node_id.startswith("overhead"):
+            return None  # A network poll timer is not its source frame rate.
+        timer = inputs.get("request_state") or inputs.get("request_position") or inputs.get("tick")
+        if isinstance(timer, dict):
+            timer = timer["source"]
+        if not timer:
+            return None
+        if not timer.startswith("dora/timer/"):
+            return self._detect(timer, visited)
+        unit, value = timer.split("/")[2:4]
+        return {"secs": 1.0, "millis": 1000.0}.get(unit, 0) / int(value)
 
 
 def _collect_dynamic_metadata(metadata, args, node):
@@ -445,6 +468,7 @@ def main():
             image = event["value"]
             format = event["metadata"]["encoding"]
             episode_writer.write_camera_image(name, image, timestamp, format)
+            episode.camera_timestamps.setdefault(name, []).append(timestamp)
 
 
 if __name__ == "__main__":
