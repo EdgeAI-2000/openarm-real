@@ -14,6 +14,7 @@ fi
     echo 'Install uv or set UV_BIN to its executable path; see README.md.' >&2
     exit 1
 }
+mkdir -p runtime/requirements
 if [[ "$mode" == dataset ]]; then
     command -v ffmpeg >/dev/null || {
         echo 'Install ffmpeg first (Ubuntu: sudo apt install ffmpeg).' >&2
@@ -29,26 +30,26 @@ if [[ "$mode" == dataset ]]; then
     "$uv_bin" pip install --python .venv-dataset/bin/python \
         "openarm_dataset @ git+https://github.com/enactic/openarm_dataset.git@$openarm_dataset_commit"
     "$uv_bin" pip check --python .venv-dataset/bin/python
-    "$uv_bin" pip freeze --python .venv-dataset/bin/python > requirements-dataset.txt
+    "$uv_bin" pip freeze --python .venv-dataset/bin/python > runtime/requirements/dataset.txt
     .venv-dataset/bin/openarm-dataset-convert --help >/dev/null
     echo 'Dataset conversion environment installed in .venv-dataset.'
     exit 0
 fi
 if [[ ! -x .venv/bin/python ]]; then "$uv_bin" venv --python 3.12 .venv; fi
 if [[ "$mode" == core ]]; then
-    "$uv_bin" pip install --python .venv/bin/python -c constraints.txt \
-        dora-rs-cli -e openarm_mujoco -e openarm_control \
-        -e dora-openarm-data-collection/nodes/dora-openarm-stereo-camera \
-        -e dora-openarm-data-collection/nodes/dora-openarm-webxr \
-        -e dora-openarm-data-collection/nodes/dora-openarm-kinematics \
-        -e dora-openarm-data-collection/nodes/dora-openarm-data-collection-ui \
-        -e dora-openarm-data-collection/nodes/dora-openarm-quitter \
-        -e dora-openarm-data-collection/nodes/dora-openarm-dataset-recorder
+    "$uv_bin" pip install --python .venv/bin/python -c requirements/constraints.txt \
+        dora-rs-cli -e packages/openarm_mujoco -e packages/openarm_control \
+        -e nodes/dora-openarm-stereo-camera \
+        -e nodes/dora-openarm-webxr \
+        -e nodes/dora-openarm-kinematics \
+        -e nodes/dora-openarm-data-collection-ui \
+        -e nodes/dora-openarm-quitter \
+        -e nodes/dora-openarm-dataset-recorder
 else
-    "$uv_bin" pip install --python .venv/bin/python -c constraints.txt \
-        -e dora-openarm-data-collection/nodes/dora-openarm
+    "$uv_bin" pip install --python .venv/bin/python -c requirements/constraints.txt \
+        -e nodes/dora-openarm
     .venv/bin/python -c 'import openarm_driver, openarm_can; print("Hardware imports OK; no motor connection attempted")'
 fi
 "$uv_bin" pip check --python .venv/bin/python
-"$uv_bin" pip freeze --python .venv/bin/python > "requirements-jetson-${mode}.txt"
+"$uv_bin" pip freeze --python .venv/bin/python > "runtime/requirements/jetson-${mode}.txt"
 echo 'Installed. No CAN configuration or motor startup was performed.'

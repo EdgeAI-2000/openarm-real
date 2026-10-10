@@ -6,10 +6,10 @@ The robot target is Jetson AGX Orin, Ubuntu 22.04, aarch64. Install `uv`, then r
 
 ```bash
 bash install.sh core
-.venv/bin/python preflight.py
+.venv/bin/python scripts/preflight.py
 ```
 
-The installer creates a private Python 3.12 `.venv`. Core mode installs Dora, the editable model/control packages, WebXR, IK, cameras, UI, quitter and recorder. It does not configure CAN or start motors. `preflight.py` runs an IK benchmark without connecting to CAN.
+The installer creates a private Python 3.12 `.venv`. Core mode installs Dora, the editable model/control packages, WebXR, IK, cameras, UI, quitter and recorder. It does not configure CAN or start motors. `scripts/preflight.py` runs an IK benchmark without connecting to CAN.
 
 ## 2. Connect Quest over USB (default)
 
@@ -78,7 +78,7 @@ Install a matching OpenArm CAN C++ library and tools before:
 bash install.sh hardware
 ```
 
-The hardware installer only installs/imports bindings. It does not enable motors. Driver/CAN versions are pinned in `constraints.txt` and still require verification against the actual installation.
+The hardware installer only installs/imports bindings. It does not enable motors. Driver/CAN versions are pinned in `requirements/constraints.txt` and still require verification against the actual installation.
 
 Keep the existing verified CAN configuration. Do not reset zero positions or run a generic interface-reconfiguration tool. Verify bus-to-arm identity, motor IDs, zero positions, units, initial pose, gripper range and physical emergency stop. End other hardware-control sessions normally before using this path.
 
@@ -108,9 +108,9 @@ The overhead node preserves the source JPEG and uses Jetson reception timestamps
 
 ## 7. Record episodes
 
-Edit the task prompt in `metadata_real_stereo.yaml`, or `metadata_real_stereo_d455.yaml` for five-camera mode. Keep task semantics consistent between collection and training.
+Edit the task prompt in `metadata/bimanual-stereo.yaml`, or `metadata/bimanual-stereo-d455.yaml` for five-camera mode. Keep task semantics consistent between collection and training.
 
-Robot modes create a unique directory under `dora-openarm-data-collection/real_data/`. Motor Start/Stop and episode recording are separate controls:
+Robot modes create a unique directory under `data/raw/`. Motor Start/Stop and episode recording are separate controls:
 
 1. Confirm both arms' state and every configured camera stream are updating.
 2. Right-controller A while idle starts an episode.
@@ -126,8 +126,8 @@ Install system `ffmpeg` before creating the separate conversion environment:
 ```bash
 bash install.sh dataset
 bash convert.sh \
-  dora-openarm-data-collection/real_data/YOUR_DATASET \
-  lerobot_data/YOUR_NEW_OUTPUT
+  data/raw/YOUR_DATASET \
+  data/lerobot/YOUR_NEW_OUTPUT
 ```
 
 The converter is pinned to upstream `openarm_dataset` commit `a69fe37384e26bb5c3059de4a52cd6e871727011`. It writes Parquet and MP4 without installing LeRobot training dependencies. Dataset installation does not require Jetson/aarch64, so conversion can be moved to a Python 3.12 Linux workstation.

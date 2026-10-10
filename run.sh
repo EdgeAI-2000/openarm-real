@@ -13,9 +13,9 @@ camera_version="${3:-standard}"
 if (( $# > 3 )); then usage; exit 2; fi
 case "$camera_version" in standard|d455) ;; *) usage; exit 2;; esac
 case "$transport" in
-    wifi) dataflow="dataflow-jetson-${mode}.yaml" ;;
+    wifi) dataflow="dataflows/wifi/${mode}.yaml" ;;
     usb-stereo)
-        dataflow="dataflow-jetson-${mode}-usb-stereo.yaml"
+        dataflow="dataflows/usb/${mode}.yaml"
         ;;
     *) usage; exit 2 ;;
 esac
@@ -26,9 +26,9 @@ if [[ "$camera_version" == d455 ]]; then
         exit 2
     fi
     camera_suffix='-d455'
-    dataflow="dataflow-jetson-${mode}-usb-stereo-d455.yaml"
+    dataflow="dataflows/usb/${mode}-d455.yaml"
 fi
-[[ -f "dora-openarm-data-collection/$dataflow" ]] || {
+[[ -f "$dataflow" ]] || {
     echo "Missing dataflow: $dataflow" >&2; exit 1;
 }
 [[ -x .venv/bin/python ]] || {
@@ -135,7 +135,7 @@ else
 fi
 echo 'Collection UI: http://127.0.0.1:8000/'
 if [[ "$mode" != check ]]; then
-    echo "OpenArm dataset: dora-openarm-data-collection/real_data/$NAME/"
+    echo "OpenArm dataset: data/raw/$NAME/"
 fi
 if [[ "$transport" == usb-stereo ]]; then
     if [[ "$camera_version" == d455 ]]; then
@@ -145,7 +145,6 @@ if [[ "$transport" == usb-stereo ]]; then
     fi
     echo 'Camera monitor: http://127.0.0.1:8000/monitor (use /monitor on the SSH-forwarded UI)'
 fi
-cd dora-openarm-data-collection
 if [[ "$transport" == usb-stereo ]]; then
     dora run "$dataflow"
 else

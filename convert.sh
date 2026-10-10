@@ -45,7 +45,7 @@ case "$include_invalid" in 0|1) ;; *) echo 'LEROBOT_INCLUDE_INVALID must be 0 or
 if [[ $# -eq 2 ]]; then
     output_dir="$(realpath -m "$2")"
 else
-    output_dir="$root_dir/lerobot_data/$(basename "$input_dir")-${format//./_}"
+    output_dir="$root_dir/data/lerobot/$(basename "$input_dir")-${format//./_}"
 fi
 [[ "$input_dir" != "$output_dir" ]] || { echo 'Input and output paths must differ.' >&2; exit 1; }
 [[ ! -e "$output_dir" ]] || {

@@ -11,11 +11,11 @@ os.environ['OPENBLAS_NUM_THREADS'] = '1'
 import numpy as np
 from openarm_control import Kinematics, register_common_args, register_ik_args, setup_from_args, ik_params_from_args
 
-root = Path(__file__).resolve().parent
+root = Path(__file__).resolve().parents[1]
 p = argparse.ArgumentParser()
 register_common_args(p)
 register_ik_args(p)
-args = p.parse_args(['--xml', str(root / 'openarm_mujoco/v2/pedestal/pedestal.xml'),
+args = p.parse_args(['--xml', str(root / 'packages/openarm_mujoco/v2/pedestal/pedestal.xml'),
                      '--mode', 'bimanual', '--max-iters', '10', '--dt', '0.01',
                      '--damping', '0.1', '--posture-cost', '0.01', '--lm-damping', '0.01',
                      '--limit-velocity', '--config', str(root / 'config/ik.yaml')])

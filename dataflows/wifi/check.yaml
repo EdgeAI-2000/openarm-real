@@ -2,7 +2,7 @@ nodes:
 - id: ui
   path: dora-openarm-data-collection-ui
   env:
-    METADATA_FILE: metadata_real_right.yaml
+    METADATA_FILE: ../../metadata/bimanual.yaml
     AUTO_OPEN: 'no'
     ARM_AUTO_START: 'no'
     PORT: '8000'
@@ -17,8 +17,6 @@ nodes:
     vr_receive_times:
       source: webxr/vr_receive_times
       queue_size: 100
-    arm_status_right:
-      source: follower-right/status
   outputs:
   - command
   - arm_command
@@ -32,8 +30,8 @@ nodes:
 - id: webxr
   path: dora-openarm-webxr
   env:
-    TLS_CERTIFICATE_FILE: ../config/tls/server.crt
-    TLS_KEY_FILE: ../config/tls/server.key
+    TLS_CERTIFICATE_FILE: ../../config/tls/server.crt
+    TLS_KEY_FILE: ../../config/tls/server.key
     HOST: 0.0.0.0
     PORT: '8443'
   inputs:
@@ -56,48 +54,27 @@ nodes:
   - pose_reference
 - id: ik
   path: dora-openarm-ik
-  args: --xml ../openarm_mujoco/v2/pedestal/pedestal.xml --mode right --max-iters
-    10 --dt 0.01 --damping 0.1 --posture-cost 0.01 --lm-damping 0.01 --limit-velocity
-    --config ../config/ik.yaml --require-feedback
+  args: --xml ../../packages/openarm_mujoco/v2/pedestal/pedestal.xml --mode bimanual
+    --max-iters 10 --dt 0.01 --damping 0.1 --posture-cost 0.01 --lm-damping 0.01 --limit-velocity
+    --config ../../config/ik.yaml
   inputs:
     tick: quittable-tick-leader/tick
     target_right:
       source: webxr/pose_right
       queue_size: 1
-    trigger_right: webxr/trigger_right
-    feedback_right:
-      source: follower-right/state
+    target_left:
+      source: webxr/pose_left
       queue_size: 1
+    trigger_right: webxr/trigger_right
+    trigger_left: webxr/trigger_left
   outputs:
   - position_left
   - position_right
   - status
-- id: follower-right
-  path: dora-openarm
-  args: --side right --align-trigger gripper --config openarm_pedestal
-  inputs:
-    request_state: dora/timer/millis/50
-    move_position:
-      source: ik/position_right
-      queue_size: 1
-    command: ui/arm_command
-  outputs:
-  - state
-  - status
-  - action
-  - safety_stop
-- id: recorder
-  path: dora-openarm-dataset-recorder
-  env:
-    METADATA_FILE: metadata_real_right.yaml
-    DIRECTORY: real_data
-  inputs:
-    command: ui/command
-    arm_right_action: follower-right/action
-    arm_right_observation: follower-right/state
 - id: probe
-  path: ../probe.sh
+  path: ../../scripts/probe.sh
   inputs:
     right: ik/position_right
+    left: ik/position_left
     tick: dora/timer/secs/1
     command: ui/command

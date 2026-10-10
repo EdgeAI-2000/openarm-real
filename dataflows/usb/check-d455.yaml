@@ -1,0 +1,137 @@
+nodes:
+- id: ui
+  path: dora-openarm-data-collection-ui
+  env:
+    METADATA_FILE: ../../metadata/bimanual-stereo-d455.yaml
+    AUTO_OPEN: 'no'
+    ARM_AUTO_START: 'no'
+    PORT: '8000'
+  inputs:
+    tick: dora/timer/secs/1
+    button_a:
+      source: webxr/button_a
+      queue_size: 100
+    button_b:
+      source: webxr/button_b
+      queue_size: 100
+    vr_receive_times:
+      source: webxr/vr_receive_times
+      queue_size: 100
+    camera_head_left:
+      source: stereo-camera/camera_head_left
+      queue_size: 1
+    camera_head_right:
+      source: stereo-camera/camera_head_right
+      queue_size: 1
+    camera_wrist_left:
+      source: wrist-camera-left/camera_wrist_left
+      queue_size: 1
+    camera_wrist_right:
+      source: wrist-camera-right/camera_wrist_right
+      queue_size: 1
+    camera_ceiling:
+      source: overhead-camera/camera_ceiling
+      queue_size: 1
+  outputs:
+  - command
+  - arm_command
+- id: quittable-tick-leader
+  path: dora-openarm-quitter
+  inputs:
+    command: ui/command
+    tick: dora/timer/secs/1
+  outputs:
+  - tick
+- id: stereo-camera
+  path: dora-openarm-stereo-camera
+  args: --eye-width 1280 --height 720 --fps 30 --jpeg-quality 80 --layout left-right
+    --fourcc YUYV
+  inputs:
+    tick: dora/timer/millis/33
+  outputs:
+  - camera_head_left
+  - camera_head_right
+- id: wrist-camera-left
+  path: dora-openarm-wrist-camera
+  args: --side left --width 960 --height 600 --fps 30 --jpeg-quality 70 --fourcc YUYV
+  inputs:
+    tick: dora/timer/millis/33
+  outputs:
+  - camera_wrist_left
+- id: wrist-camera-right
+  path: dora-openarm-wrist-camera
+  args: --side right --width 960 --height 600 --fps 30 --jpeg-quality 70 --fourcc
+    YUYV
+  inputs:
+    tick: dora/timer/millis/33
+  outputs:
+  - camera_wrist_right
+- id: overhead-camera
+  path: dora-openarm-overhead-camera
+  inputs:
+    tick: dora/timer/millis/33
+  outputs:
+  - camera_ceiling
+- id: webxr
+  path: dora-openarm-webxr
+  env:
+    NO_TLS: 'true'
+    HOST: 127.0.0.1
+    PORT: '8443'
+    VIEW_CONFIGURATION_FILE: ../../config/view_camera_stereo.yaml
+  inputs:
+    tick: quittable-tick-leader/tick
+    camera_head_left:
+      source: stereo-camera/camera_head_left
+      queue_size: 1
+    camera_head_right:
+      source: stereo-camera/camera_head_right
+      queue_size: 1
+    camera_wrist_left:
+      source: wrist-camera-left/camera_wrist_left
+      queue_size: 1
+    camera_wrist_right:
+      source: wrist-camera-right/camera_wrist_right
+      queue_size: 1
+  outputs:
+  - pose_right
+  - trigger_right
+  - pose_left
+  - trigger_left
+  - joystick_x_right
+  - joystick_y_right
+  - joystick_x_left
+  - joystick_y_left
+  - button_a
+  - button_b
+  - button_x
+  - button_y
+  - status
+  - vr_receive_times
+  - pose_reference
+- id: ik
+  path: dora-openarm-ik
+  args: --xml ../../packages/openarm_mujoco/v2/pedestal/pedestal.xml --mode bimanual
+    --max-iters 10 --dt 0.01 --damping 0.1 --posture-cost 0.01 --lm-damping 0.01 --limit-velocity
+    --config ../../config/ik.yaml
+  inputs:
+    tick: quittable-tick-leader/tick
+    target_right:
+      source: webxr/pose_right
+      queue_size: 1
+    target_left:
+      source: webxr/pose_left
+      queue_size: 1
+    trigger_right: webxr/trigger_right
+    trigger_left: webxr/trigger_left
+  outputs:
+  - position_left
+  - position_right
+  - status
+- id: probe
+  path: ../../scripts/probe.sh
+  inputs:
+    right: ik/position_right
+    left: ik/position_left
+    tick: dora/timer/secs/1
+    command: ui/command

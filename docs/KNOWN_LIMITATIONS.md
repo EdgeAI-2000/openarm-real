@@ -21,7 +21,7 @@
 
 ## Reproducibility and data
 
-- `constraints.txt` pins selected versions, not a complete lockfile. Historical requirements records are not reproducibility guarantees.
+- `requirements/constraints.txt` pins selected versions, not a complete lockfile. Historical requirements records are not reproducibility guarantees.
 - Hardware imports and an IK benchmark do not validate bus/motor communication.
 - The snapshot has no original top-level Git history; base revisions and publication changes are in PROVENANCE.md.
 - Camera timer settings do not prove achieved FPS. The D455 stream depends on external sender/receiver/ROS bridge services and includes network delay. Streams are not hardware-synchronized.

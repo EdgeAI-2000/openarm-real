@@ -47,3 +47,7 @@ The source machine's files were not modified during the initial publication. The
 ## Software repair update (2026-10-10)
 
 Added the missing Wi-Fi bimanual graph, feedback-aware IK, follower guards and cleanup, actual-command recording, measured episode frequencies, historical frequency repair, source-manifest maintenance and hardware-free tests/CI. Control wrappers/dataflows are modified relative to the initial publication. Physical startup/stop remains the responsibility of the installed driver.
+
+## Directory and documentation update
+
+Split the project overview into complete English and Chinese READMEs. Moved reusable packages to `packages/`, Dora nodes to `nodes/`, workflows to transport-specific `dataflows/` directories, task templates to `metadata/`, utility entrypoints to `scripts/`, and dependency records to `requirements/`. New recordings/conversions use `data/raw/` and `data/lerobot/`. Root install/run/convert entrypoints remain available. Upstream package internals and licenses are retained.

@@ -34,3 +34,9 @@ runtime/
 *.safetensors
 
 # Keep robot mesh files (*.obj, *.stl) under version control.
+
+# Runtime data and Dora output
+data/raw/
+data/lerobot/
+dataflows/**/out/
+artifacts/

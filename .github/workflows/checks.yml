@@ -10,19 +10,21 @@ jobs:
           python-version: '3.12'
       - name: Install compute and test dependencies
         run: >-
-          python -m pip install -c constraints.txt pytest
-          -e openarm_mujoco -e openarm_control
-          -e dora-openarm-data-collection/nodes/dora-openarm-kinematics
-          -e dora-openarm-data-collection/nodes/dora-openarm-stereo-camera
-          -e dora-openarm-data-collection/nodes/dora-openarm-webxr
-          -e dora-openarm-data-collection/nodes/dora-openarm-dataset-recorder
+          python -m pip install -c requirements/constraints.txt pytest
+          -e packages/openarm_mujoco -e packages/openarm_control
+          -e nodes/dora-openarm-kinematics
+          -e nodes/dora-openarm-stereo-camera
+          -e nodes/dora-openarm-webxr
+          -e nodes/dora-openarm-dataset-recorder
       - name: Fault injection and regression tests
         run: >-
-          python -m pytest -q tests openarm_control/tests
-          dora-openarm-data-collection/nodes/dora-openarm-stereo-camera/tests
-          dora-openarm-data-collection/nodes/dora-openarm-webxr/tests
-          dora-openarm-data-collection/nodes/dora-openarm-dataset-recorder/tests
+          python -m pytest -q tests packages/openarm_control/tests
+          nodes/dora-openarm-stereo-camera/tests
+          nodes/dora-openarm-webxr/tests
+          nodes/dora-openarm-dataset-recorder/tests
       - name: Local IK benchmark
-        run: python preflight.py
+        run: python scripts/preflight.py
+      - name: Verify project layout
+        run: python scripts/check_layout.py
       - name: Verify source manifest
         run: python scripts/update_manifest.py --check

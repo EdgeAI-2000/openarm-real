@@ -28,3 +28,7 @@ The 30 FPS converted dataset is a resampled representation; it does not prove 30
 ## Physical scope
 
 No robot follower was launched on the Jetson and no motor-enable or movement command was issued. Guard thresholds, actual braking behavior, camera orientation, headset comfort and CAN mapping still need onsite validation. The retained optional Wi-Fi path requires the operating account to have access to its local TLS key; USB does not use those credentials.
+
+## Directory migration verification
+
+The reorganized tree preserves root install/run/convert commands and the default USB transport. Package imports were rebound to the new editable source locations. All 10 workflow graphs and project documentation links pass the layout checker; the 80-test suite and local IK benchmark pass after migration. Existing raw/converted data and local metadata are preserved, with compatibility links for old data/library paths.

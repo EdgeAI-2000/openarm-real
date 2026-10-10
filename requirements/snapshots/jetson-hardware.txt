@@ -8,13 +8,13 @@ click==8.5.0
 daqp==0.7.2
 detect-installer==0.2.1
 dnspython==2.8.0
--e ./dora-openarm-data-collection/nodes/dora-openarm
--e ./dora-openarm-data-collection/nodes/dora-openarm-data-collection-ui
--e ./dora-openarm-data-collection/nodes/dora-openarm-dataset-recorder
--e ./dora-openarm-data-collection/nodes/dora-openarm-kinematics
--e ./dora-openarm-data-collection/nodes/dora-openarm-quitter
--e ./dora-openarm-data-collection/nodes/dora-openarm-stereo-camera
--e ./dora-openarm-data-collection/nodes/dora-openarm-webxr
+-e ./nodes/dora-openarm
+-e ./nodes/dora-openarm-data-collection-ui
+-e ./nodes/dora-openarm-dataset-recorder
+-e ./nodes/dora-openarm-kinematics
+-e ./nodes/dora-openarm-quitter
+-e ./nodes/dora-openarm-stereo-camera
+-e ./nodes/dora-openarm-webxr
 dora-rs==0.5.0
 dora-rs-cli==0.5.0
 email-validator==2.3.0
@@ -38,9 +38,9 @@ mink==1.1.0
 mujoco==3.12.0
 numpy==2.5.3
 openarm-can==1.3.4
--e ./openarm_control
+-e ./packages/openarm_control
 openarm-driver==0.3.0
--e ./openarm_mujoco
+-e ./packages/openarm_mujoco
 opencv-python-headless==5.0.0.93
 pyarrow==25.0.1
 pydantic==2.13.5

@@ -2,7 +2,7 @@ nodes:
 - id: ui
   path: dora-openarm-data-collection-ui
   env:
-    METADATA_FILE: metadata_real_right_stereo.yaml
+    METADATA_FILE: ../../metadata/right-stereo.yaml
     AUTO_OPEN: 'no'
     ARM_AUTO_START: 'no'
     PORT: '8000'
@@ -71,7 +71,7 @@ nodes:
     NO_TLS: 'true'
     HOST: 127.0.0.1
     PORT: '8443'
-    VIEW_CONFIGURATION_FILE: ../config/view_camera_stereo.yaml
+    VIEW_CONFIGURATION_FILE: ../../config/view_camera_stereo.yaml
   inputs:
     tick: quittable-tick-leader/tick
     camera_head_left:
@@ -104,9 +104,9 @@ nodes:
   - pose_reference
 - id: ik
   path: dora-openarm-ik
-  args: --xml ../openarm_mujoco/v2/pedestal/pedestal.xml --mode right --max-iters
-    10 --dt 0.01 --damping 0.1 --posture-cost 0.01 --lm-damping 0.01 --limit-velocity
-    --config ../config/ik.yaml --require-feedback
+  args: --xml ../../packages/openarm_mujoco/v2/pedestal/pedestal.xml --mode right
+    --max-iters 10 --dt 0.01 --damping 0.1 --posture-cost 0.01 --lm-damping 0.01 --limit-velocity
+    --config ../../config/ik.yaml --require-feedback
   inputs:
     tick: quittable-tick-leader/tick
     target_right:
@@ -137,8 +137,8 @@ nodes:
 - id: recorder
   path: dora-openarm-dataset-recorder
   env:
-    METADATA_FILE: metadata_real_right_stereo.yaml
-    DIRECTORY: real_data
+    METADATA_FILE: ../../metadata/right-stereo.yaml
+    DIRECTORY: ../../data/raw
   inputs:
     command: ui/command
     arm_right_action: follower-right/action
@@ -148,7 +148,7 @@ nodes:
     camera_wrist_left: wrist-camera-left/camera_wrist_left
     camera_wrist_right: wrist-camera-right/camera_wrist_right
 - id: probe
-  path: ../probe.sh
+  path: ../../scripts/probe.sh
   inputs:
     right: ik/position_right
     tick: dora/timer/secs/1

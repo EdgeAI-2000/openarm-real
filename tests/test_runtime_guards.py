@@ -11,7 +11,7 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'dora-openarm-data-collection/nodes/dora-openarm/src'))
+sys.path.insert(0, str(ROOT / 'nodes/dora-openarm/src'))
 from dora_openarm.session import Session, GuardFault
 from dora_openarm_kinematics import ik
 from dora_openarm_dataset_recorder.main import Episode, DatasetWriter, FrequencyDetector, episode_frequencies
@@ -164,7 +164,7 @@ def test_measured_frequencies_persist_per_episode(tmp_path):
 
 
 def test_all_real_graphs_use_feedback_and_actual_sent_actions():
-    for p in (ROOT/'dora-openarm-data-collection').glob('dataflow-jetson*.yaml'):
+    for p in (ROOT/'dataflows').glob('*/*.yaml'):
         nodes=yaml.safe_load(p.read_text())['nodes']; byid={n['id']:n for n in nodes}
         for n in nodes:
             if not n['id'].startswith('follower-'): continue
